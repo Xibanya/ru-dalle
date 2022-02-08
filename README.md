@@ -1,3 +1,17 @@
+# Local Lookingglass
+This was an attempt to get Looking Glass v1.1
+https://colab.research.google.com/drive/11vdS9dpcZz2Q2efkOjcwyax4oob6N40G?usp=sharing
+working locally. This code is mostly the cells from the colab notebook pasted in and
+cleaned up, with some changes to solve exceptions I was receiving locally that
+didn't occur in the notebook.
+
+note most of the Looking Glass v1.1 notebook is derived from this notebook from the dalle repo:
+https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sharing#scrollTo=g2j_g_T7wiQd
+
+This implementation has some cool new features such as allowing resuming from a pretrained checkpoint and picking different optimizers.
+
+The rest of this readme is from the original ru-dalle repo
+
 # ruDALL-E
 ### Generate images from texts
 
