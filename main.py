@@ -78,9 +78,14 @@ so it's easier to share
 XIB NOTE: if true, looks for a checkpoint in directory 
 'checkpoints/lookingglass_dalle_{RESUME_FROM}.pt'
 """
-RESUME = True
+RESUME = False
 RESUME_FROM = 'last'
-TRAIN = False
+TRAIN = True
+"""
+if true has a visualization of the training loss pop up; 
+execution of the script halts until you dissmiss it.
+"""
+SHOW_TRAINING_PLOTS = False
 
 """
 XIB NOTE: DON'T CHANGE THESE
@@ -327,7 +332,7 @@ class RuDalleDataset(Dataset):
         ])
 
         df = pd.read_csv(csv_path)
-        # TODO: not this
+        # TODO: not this - Xib
         self.samples.append(["content", INPUT_IMAGE, input_text])
         for caption, f_path in zip(df['caption'], df['name']):
             if 1 < len(caption) < 100 and os.path.isfile(f'{file_path}/{f_path}'):
@@ -450,15 +455,16 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
                         model.state_dict(),
                         os.path.join(argz.save_path, f"{argz.model_name}_dalle_{save_counter}.pt")
                     )
-                    plt.plot(loss_logs)
-                    plt.show()
+                    if SHOW_TRAINING_PLOTS:
+                        plt.plot(loss_logs)
+                        plt.show()
                 loss_logs += [loss.item()]
                 progress.update()
                 progress.set_postfix({"loss": loss.item()})
 
         print_green(f'\nTuned and saved here: {argz.model_name}_dalle_last.pt')
 
-        if EPOCH_AMOUNT % argz.save_every != 0:
+        if SHOW_TRAINING_PLOTS and EPOCH_AMOUNT % argz.save_every != 0:
             plt.plot(loss_logs)
             plt.show()
 
