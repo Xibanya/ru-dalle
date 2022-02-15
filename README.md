@@ -10,6 +10,9 @@ https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sh
 
 This implementation has some cool new features such as allowing resuming from a pretrained checkpoint and picking different optimizers.
 
+## Pretrained models
+[Anime Sunset Malevich](https://huggingface.co/Xibanya/sunset_city)
+
 The rest of this readme is from the original ru-dalle repo
 
 # ruDALL-E
