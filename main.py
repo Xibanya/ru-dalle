@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 """
 NOTE FROM XIBANYA:
 This was an attempt to get Looking Glass v1.1
@@ -10,10 +12,13 @@ note most of the Looking Glass v1.1 notebook is derived from this notebook from 
 https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sharing#scrollTo=g2j_g_T7wiQd
 """
 import csv
+import datetime
 import gc
 import glob
 import math
 import multiprocessing
+import os.path
+import pathlib
 import random
 import warnings
 from functools import partial
@@ -33,36 +38,17 @@ from psutil import virtual_memory
 from pynvml import *
 from torch.utils.data import Dataset
 from torch.utils.data import Dataset, DataLoader
-from torch.optim import lr_scheduler, adamax, rmsprop, adam
+from torch.optim import lr_scheduler, adam
 from tqdm import tqdm
 from transformers import AdamW
 
-import rudalle
+
 from rudalle import get_rudalle_model, get_tokenizer, get_vae
 from rudalle import utils
 from rudalle.dalle.utils import exists, is_empty
 from rudalle.pipelines import generate_images, show
 
-
-class Colors:
-    HEADER = '\033[95m'; OKBLUE = '\033[94m'; OKCYAN = '\033[96m'; OKGREEN = '\033[92m'
-    WARNING = '\033[93m'; FAIL = '\033[91m'; ENDC = '\033[0m'; BOLD = '\033[1m'; UNDERLINE = '\033[4m'
-
-
-def print_cyan(msg):
-    print(f"{Colors.OKCYAN}{msg}{Colors.ENDC}")
-
-
-def print_blue(msg):
-    print(f"{Colors.OKBLUE}{msg}{Colors.ENDC}")
-
-
-def print_green(msg):
-    print(f"{Colors.OKGREEN}{msg}{Colors.ENDC}")
-
-
-def print_warn(msg):
-    print(f"{Colors.WARNING}{msg}{Colors.ENDC}")
+from colors import print_cyan, print_blue, print_green, print_warn
 
 
 #####################################################
@@ -76,11 +62,14 @@ so it's easier to share
 
 """
 XIB NOTE: if true, looks for a checkpoint in directory 
-'checkpoints/lookingglass_dalle_{RESUME_FROM}.pt'
+'checkpoints/{RESUME_FROM}.pt'
 """
-RESUME = False
-RESUME_FROM = 'last'
-TRAIN = True
+RESUME = True
+RESUME_FROM = 'nature_last' #'rudalle_dalle_last'
+TRAIN = False
+SAVE_PATH = 'checkpoints/'
+MODEL_NAME = 'nature'
+OUTPUT_FOLDER = 'Nature'
 """
 if true has a visualization of the training loss pop up; 
 execution of the script halts until you dissmiss it.
@@ -101,11 +90,14 @@ IMAGE_AMOUNT = ONE_IMAGE
 LOW = "Low"
 MEDIUM = "Medium"
 HIGH = "High"
+CUSTOM = "Custom"
 """
 Universe similarity determines how close to the original images you will receive. 
-High similarity produces alternate versions of an image, low similarity produces "variations on a theme".
+High similarity produces alternate versions of an image, low similarity produces 
+"variations on a theme".
 """
-universe_similarity = LOW
+universe_similarity = CUSTOM
+CUSTOM_LEARNING_RATE = 1e-6
 width = 256
 height = 256
 BATCH_SIZE = 1
@@ -114,14 +106,13 @@ The amount of epochs that training occurs for.
 Turn down if the images are too similar to the base image. 
 Turn up if they're too different. Use this for fine adjustments.
 """
-EPOCH_AMOUNT = 50
+EPOCH_AMOUNT = 5
 WARMUP_STEPS = 50
 """
 XIB NOTE: this prints epoch number when iterating over epochs
-but is kinda pointless right now because training doesn't work
 """
 LOG_EPOCH = 10
-SAVE_EVERY = 50
+SAVE_EVERY = 100
 """
 XIB NOTE: put this in a /content directory
 """
@@ -131,25 +122,33 @@ Multiple Image Tuning
 Set this variable to "True" to enable Multiple Image Tuning.
 This attempts to make a collage trained on every image in the folder at once.
 """
-multiple_image_tuning = False
+multiple_image_tuning = True
 
 """
 If the folder has no images or `folder_to_train` is `""`, Multiple Image Tuning will be skipped
 even if multiple_image_tuning is True
 """
-folder_to_train = ""
+folder_to_train = "Data/Nature"
 
 """
-Input text can influence the end result you get to a minor degree, so you have the option to change it now.
+Input text can influence the end result you get to a minor degree, so you have the 
+option to change it now.
 THIS MUST HAVE AT LEAST ONE CHARACTER IN IT IN IT OTHERWISE THE FINE-TUNING WILL BREAK.
-Input text **must be in Russian**. You do not need to change this, though, unless you are a perfectionist.
+Input text **must be in Russian**. You do not need to change this, though, 
+unless you are a perfectionist.
 
 XIB NOTE: this is the original prompt from bearsharktopus's notebook but to use it here
 you have to encode/decode to utf8. the provided prompt is the same thing but in latin script
 "\u0420\u0438\u0447\u0430\u0440\u0434 \u0414. \u0414\u0436\u0435\u0439\u043C\u0441 Aphex Twin"
 #.encode('utf8') to get around unicode errors?
 """
-input_text = "Richard D. James. Aphex Twin"
+readable_caption = 'nature'  # this is just for output file name
+# u"город"
+# u"Сэйлор Мун"
+# u"мультяшный кот"
+# u"город на закате"
+# u prefix is needed for cyrillic to work
+input_text = u"природа"
 
 """
 If you *really* want to make a 9 or 25 image collage but have a weak CPU, you can try turning on low mem mode. 
@@ -175,14 +174,13 @@ XIB NOTE: if you do ML generation a lot you already know what these are
 """
 TOP_P = 0.999
 TOP_K = 2048
+TEMPERATURE = 1.0
 
 """
 XIB NOTE: switch these up to get different kinds of output. fun!
 """
 ADAMW = 'AdamW'
 ADAM = 'Adam'
-ADAMAX = 'Adamax'
-RMSProp = 'RMSProp'
 OPTIMIZER = ADAMW
 
 ##############################################################
@@ -212,15 +210,13 @@ info = nvmlDeviceGetMemoryInfo(h)
 if info.total > 16252636672:
     print_green('Everything is ok, you can begin')
 else:
-    print_blue('Potential OOM issues?')
+    print_warn('Potential OOM issues?')
 
-SAVE_PATH = 'checkpoints/'
-MODEL_NAME = 'lookingglass'
 
 device = 'cuda'
 model = get_rudalle_model('Malevich', pretrained=True, fp16=True, device=device)
 if RESUME:
-    model_path = os.path.join(SAVE_PATH, f"{MODEL_NAME}_dalle_{RESUME_FROM}.pt")
+    model_path = os.path.join(SAVE_PATH, f"{RESUME_FROM}.pt")
     model.load_state_dict(torch.load(model_path))
     print(f'Loaded from {model_path}')
 
@@ -237,7 +233,22 @@ elif universe_similarity == MEDIUM:
 elif universe_similarity == LOW:
     learning_rate = 1e-5
 else:
-    learning_rate = 1e-5
+    learning_rate = CUSTOM_LEARNING_RATE
+
+if TRAIN:
+    print_cyan(f'learning rate: {learning_rate}')
+
+
+def save_images(image_data, suffix: str):
+    for j in range(len(image_data)):
+        s_folder = 'content/output/' + folder_to_train + '/'
+        pathlib.Path(s_folder).mkdir(parents=True, exist_ok=True)
+        s_name = f"{folder_to_train}_{readable_caption}_{str(n)}{suffix}"
+        s_path = pathlib.Path(os.path.join(s_folder, s_name + '.png'))
+        if pathlib.Path.exists(s_path):
+            s_name = s_name + datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        print_cyan(f'attempting to save {s_name}')
+        pil_images[n].save(s_folder + s_name + '.png')
 
 
 class Args:
@@ -250,7 +261,7 @@ class Args:
         self.save_every = SAVE_EVERY
         self.prefix_length = 10
         self.bs = BATCH_SIZE
-        self.clip = 0.24
+        self.clip = 0.25
         self.lr = learning_rate
         self.warmup_steps = WARMUP_STEPS
         self.wandb = False
@@ -270,11 +281,13 @@ h = round(height / 8)
 
 
 files_to_train = []
+types = ('*.png', '*.jpg', "*.jpeg", "*.bmp")
+
 if multiple_image_tuning:
-    files_to_train = glob.glob('/content/' + folder_to_train + '/*.png')
-    files_to_train = files_to_train + glob.glob('/content/' + folder_to_train + '/*.jpg')
-    files_to_train = files_to_train + glob.glob('/content/' + folder_to_train + '/*.jpeg')
-    files_to_train = files_to_train + glob.glob('/content/' + folder_to_train + '/*.bmp')
+    for ext in types:
+        files_to_train.extend(glob.glob(os.path.join('content/' + folder_to_train, ext)))
+    if TRAIN:
+        print_blue(f"{len(files_to_train)} training images found")
 
 if folder_to_train == "" or len(files_to_train) == 0:
     multiple_image_tuning = False
@@ -282,18 +295,18 @@ if folder_to_train == "" or len(files_to_train) == 0:
 if not multiple_image_tuning:
     folder_to_train = ""
 
-with open('data_desc.csv', 'w', newline='') as csvfile:
+with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',')
     spamwriter.writerow(['', 'name', 'caption'])
     spamwriter.writerow(['0', file_to_train, input_text])
 file_to_train = "/content/" + file_to_train
 
 if multiple_image_tuning:
-    with open('data_desc.csv', 'w', newline='') as csvfile:
+    with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerow(['', 'name', 'caption'])
         for i in range(len(files_to_train)):
-            files_to_train[i] = files_to_train[i].replace("/content/" + folder_to_train + "/", "")
+            files_to_train[i] = files_to_train[i].replace("content/" + folder_to_train + "\\", "")
             spamwriter.writerow([i, files_to_train[i], input_text])
 
 
@@ -329,11 +342,21 @@ class RuDalleDataset(Dataset):
                                 scale=(1., 1.),  # в train было scale=(0.75., 1.),
                                 ratio=(1., 1.)),
             T.ToTensor()
+            # T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
 
         df = pd.read_csv(csv_path)
         # TODO: not this - Xib
-        self.samples.append(["content", INPUT_IMAGE, input_text])
+        if not multiple_image_tuning:
+            print_blue(f'appending {INPUT_IMAGE} to dataset')
+            self.samples.append(["content", INPUT_IMAGE, input_text])
+        else:
+            paths = []
+            for ex in types:
+                paths.extend(glob.glob(os.path.join("content/" + folder_to_train, ex)))
+            for path in paths:
+                path = path.replace('content/', '')
+                self.samples.append(["content", path, input_text])
         for caption, f_path in zip(df['caption'], df['name']):
             if 1 < len(caption) < 100 and os.path.isfile(f'{file_path}/{f_path}'):
                 self.samples.append([file_path, f_path, caption])
@@ -371,12 +394,9 @@ if OPTIMIZER == ADAMW:
     optimizer = AdamW(model.parameters(), lr=learning_rate)
 elif OPTIMIZER == ADAM:
     optimizer = adam.Adam(model.parameters(), lr=learning_rate)
-elif OPTIMIZER == ADAMAX:
-    optimizer = adamax.Adamax(model.parameters(), lr=learning_rate)
-elif OPTIMIZER == RMSProp:
-    optimizer = rmsprop.RMSprop(model.parameters(), lr=learning_rate)
 else:
     optimizer = AdamW(model.parameters(), lr=learning_rate)
+
 
 scheduler = lr_scheduler.OneCycleLR(
     optimizer=optimizer,
@@ -389,7 +409,6 @@ scheduler = lr_scheduler.OneCycleLR(
 
 
 def freeze(
-        t_model: rudalle.dalle.DalleModel,
         freeze_emb=True,
         freeze_ln=False,
         freeze_attn=False,
@@ -411,7 +430,6 @@ def freeze(
     return model
 
 
-# @title
 def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
     """
     args - arguments for training
@@ -439,7 +457,7 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
 
                 input_ids = torch.cat((data_text, image_input_ids), dim=1)
                 _, loss = forward(model.module, input_ids, attention_mask.half(),
-                                  return_loss=True, use_cache=False, gradient_checkpointing=6)
+                                  return_loss=True, use_cache=False, gradient_checkpointing=True)
                 loss = loss["image"]
                 # train step
                 loss.backward()
@@ -448,12 +466,13 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
+
                 # save every here
                 if (epoch + 1) % argz.save_every == 0:
-                    print_green(f'Saving checkpoint here {argz.model_name}_dalle_{save_counter}.pt')
+                    print_green(f'Saving checkpoint here {argz.model_name}_{save_counter}.pt')
                     torch.save(
                         model.state_dict(),
-                        os.path.join(argz.save_path, f"{argz.model_name}_dalle_{save_counter}.pt")
+                        os.path.join(argz.save_path, f"{argz.model_name}_{save_counter}.pt")
                     )
                     if SHOW_TRAINING_PLOTS:
                         plt.plot(loss_logs)
@@ -462,25 +481,25 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
                 progress.update()
                 progress.set_postfix({"loss": loss.item()})
 
-        print_green(f'\nTuned and saved here: {argz.model_name}_dalle_last.pt')
-
         if SHOW_TRAINING_PLOTS and EPOCH_AMOUNT % argz.save_every != 0:
             plt.plot(loss_logs)
             plt.show()
 
         torch.save(
             model.state_dict(),
-            os.path.join(argz.save_path, f"{argz.model_name}_dalle_last.pt")
+            os.path.join(argz.save_path, f"{argz.model_name}_last.pt")
         )
+        print_green(f'\nTuned and saved here: {argz.model_name}_last.pt')
+
     except KeyboardInterrupt:
         print_warn(f'What for did you stopped? Please change model_path '
-                   f'to /{argz.save_path}/{argz.model_name}_dalle_Failed_train.pt')
+                   f'to /{argz.save_path}{argz.model_name}_Failed_train.pt')
         plt.plot(loss_logs)
         plt.show()
 
         torch.save(
             model.state_dict(),
-            os.path.join(argz.save_path, f"{argz.model_name}_dalle_Failed_train.pt")
+            os.path.join(argz.save_path, f"{argz.model_name}_Failed_train.pt")
         )
     except Exception as err:
         print_warn(f'Failed with {err}')
@@ -586,8 +605,7 @@ def forward(
 
 
 # @title
-model = freeze(t_model=model,
-               freeze_emb=False,
+model = freeze(freeze_emb=False,
                freeze_ln=False,
                freeze_attn=True,
                freeze_ff=True,
@@ -786,12 +804,13 @@ def crop_max_square(pil_img):
 
 
 for i in range(collage_amount):
-    for i in range(repeat):
+    for n in range(repeat):
         for top_k, top_p, images_num in [(TOP_K, TOP_P, amt)]:
             if resize:
                 _pil_images, _ = slow_generate_images(
                     text, tokenizer, model, vae, top_k=top_k,
-                    images_num=images_num, top_p=top_p, w=w, h=h)
+                    images_num=images_num, top_p=top_p, w=w, h=h
+                )
                 pil_images += _pil_images
             else:
                 _pil_images, _ = generate_images(
@@ -820,18 +839,23 @@ for i in range(collage_amount):
                 )
                 pil_images += _pil_images
 
-    # XIB NOTE: this doesn't work
-    # onlyfiles = next(os.walk('/content/output/'))[2]
     if multiple_image_tuning:
         file_to_train = folder_to_train + "/" + random.choice(files_to_train)
         for n in range(len(pil_images)):
-            pil_images[i].save(f"/content/output/lg" + str(n) + "_" + folder_to_train + ".png")
+            save_folder = 'content/output/' + OUTPUT_FOLDER + '/'
+            pathlib.Path(save_folder).mkdir(parents=True, exist_ok=True)
+            save_name = f"{readable_caption}_{str(n)}"
+            save_path = pathlib.Path(os.path.join(save_folder, save_name + '.png'))
+            if pathlib.Path.exists(save_path):
+                save_name = save_name + datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+            print_cyan(f'attempting to save {save_name}')
+            pil_images[n].save(save_folder + save_name + '.png')
     else:
         ft = file_to_train.split('/')[-1]
         for n in range(len(pil_images)):
-            pil_images[i].save(f"content/output/lg{str(n)}_{ft}")
+            pil_images[n].save(f"content/output/{readable_caption}_{str(n)}_{ft}")
 
-    if not skip_gt:
+    if not multiple_image_tuning and not skip_gt:
         img_path = f"content\\{INPUT_IMAGE}"
         if not resize:
             with Image.open(img_path) as im:
@@ -850,4 +874,5 @@ for i in range(collage_amount):
     pil_images = []
     scores = []
 
+torch.cuda.empty_cache()
 gc.collect()
