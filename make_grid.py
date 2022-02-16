@@ -60,6 +60,3 @@ def supersize_all(folder: str = FOLDER, model: str = 'x4'):
     for n in range(len(images)):
         path = paths[n].replace('.png', '')
         images[n].save(f'{path}_{model}.png')
-
-
-supersize_all()
