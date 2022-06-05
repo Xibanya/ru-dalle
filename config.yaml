@@ -1,4 +1,4 @@
-resume: True  # false to start a new model, will overwrite the existing model if present
+resume: True  # False to start a new model, setting False will overwrite the existing model if present
 model_name: City
 caption: 'an illustration of a City'
 use_default_caption: False
