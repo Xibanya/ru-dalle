@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 NOTE FROM XIBANYA:
-most of this code is derived from this notebook:
-https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sharing#scrollTo=g2j_g_T7wiQd
+This was an attempt to get Looking Glass v1.1
+https://colab.research.google.com/drive/11vdS9dpcZz2Q2efkOjcwyax4oob6N40G?usp=sharing
+working locally. This code is mostly the cells from the colab notebook pasted in and
+cleaned up, with some changes to solve exceptions I was receiving locally that
+didn't occur in the notebook.
 
-Most of my comments are attributed to me directly in some way. If they aren't, 
-they're probably from the original notebook (ie, not written by me)
-Direct any questions or comments thusly?
+note most of the Looking Glass v1.1 notebook is derived from this notebook from the dalle repo:
+https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sharing#scrollTo=g2j_g_T7wiQd
 """
 import csv
 import datetime
@@ -53,51 +55,31 @@ with open(f'config.yaml', 'r') as f:
 
 #####################################################
 """
-XIB NOTE:
-generally you won't need to mess with these parameters directly, 
-you'll really only want to use the params surfaced in config.yaml.
-
-The structure here assumes that your model will be at 'checkpoints/[model name]'
-the training dataset for your model will be found at 'content/Data/[model name]'
-and the generated output should be saved to 'content/output/[model name'
+XIB NOTE: if true, looks for a checkpoint in directory 
+'checkpoints/{RESUME_FROM}.pt'
 """
-MODEL_NAME = cfg['model_name']
+RESUME = cfg['resume']
+MODEL_NAME = cfg['train_model']
+RESUME_FROM = MODEL_NAME
 SAVE_PATH = 'checkpoints/'
 OUTPUT_FOLDER = MODEL_NAME
 INPUT_FOLDER = 'Data/' + MODEL_NAME
-
-"""
-XIB NOTE: if RESUME is true, model is loaded from 
-'checkpoints/{RESUME_FROM}.pt'
-Only RESUME_FROM to something other than MODEL_NAME if you want to 
-resume from an existing model without overwriting it
-"""
-RESUME = cfg['resume']
-RESUME_FROM = MODEL_NAME
+INDIVIDUAL_DESCRIPTION_FILE = 'data_desc.csv'  # leave as 'data_desc.csv' if none
 
 """ 
-XIB NOTE: probably use DEFAULT_CAPTION when TRANSLATE is False but you don't wanna make up an actual Russian caption?
+XIB NOTE: probably use DEFAULT_CAPTION when TRANSLATE is False?
 """
 DEFAULT_CAPTION = "\u0420\u0438\u0447\u0430\u0440\u0434 \u0414. \u0414\u0436\u0435\u0439\u043C\u0441 Aphex Twin"
-CAPTION = cfg['caption'] if not cfg['use_default_caption'] else DEFAULT_CAPTION
+CAPTION = cfg['train_prompt'] if cfg['train_prompt'] else DEFAULT_CAPTION
 SAVE_NAME = CAPTION  # file name prefix for the saved images
 # set to false if all the translation API calls for the day have been used up or input is in Russian already
 TRANSLATE = cfg['translate']
-"""
-XIB NOTE:
-You can specify a caption per input file by putting a data_desc.csv 
-file in 'content/Data/[model name]' but this is optional. Any image
-without an individual description will be fed into the model with
-the description assigned to CAPTION (translated, if TRANSLATE is True)
-"""
-INDIVIDUAL_DESCRIPTION_FILE = 'data_desc.csv'  # leave as 'data_desc.csv' if none
 
 """ XIB NOTE: these are constants, don't change these! """
 LOW = "Low"  # 1e-5
 MEDIUM = "Medium"  # 2e-5
 HIGH = "High"  # 1e-4
 CUSTOM = "Custom"
-
 """
 Universe similarity determines how close to the original images you will receive. 
 High similarity produces alternate versions of an image, low similarity produces 
@@ -115,31 +97,26 @@ Turn up if they're too different. Use this for fine adjustments.
 """
 EPOCH_AMOUNT = cfg['epochs']
 WARMUP_STEPS = cfg['warmup_steps']
-
 """
 XIB NOTE: this prints epoch number when iterating over epochs
 set to <= 0 to not use
 """
 LOG_EPOCH = cfg['log_epoch']
-
 """
 XIB NOTE: Generates an image every PREVIEW_EPOCH epochs
 set to <= 0 to not use
 """
 PREVIEW_EPOCH = cfg['preview_epoch']
-
 """
 XIB NOTE: saves checkpoint every SAVE_EVERY epochs (saves checkpoint at end regardless)
 set to <= 0 to not use
 """
 SAVE_EPOCH = cfg['save_epoch']
-
 """
 XIB NOTE: put this in a /content directory
 Only used if multiple_image_tuning is False
 """
 INPUT_IMAGE = "testpic.png"
-
 """
 Multiple Image Tuning
 Set this variable to "True" to enable Multiple Image Tuning.
@@ -158,19 +135,26 @@ if true has a visualization of the training loss pop up;
 execution of the script halts until you dissmiss it.
 """
 SHOW_TRAINING_PLOTS = False
-
 """
 Input text can influence the end result you get to a minor degree, so you have the 
 option to change it now.
 THIS MUST HAVE AT LEAST ONE CHARACTER IN IT IN IT OTHERWISE THE FINE-TUNING WILL BREAK.
 Input text **must be in Russian**. You do not need to change this, though, 
 unless you are a perfectionist.
+
+XIB NOTE: this is the original prompt from bearsharktopus's notebook but to use it here
+you have to encode/decode to utf8. the provided prompt is the same thing but in latin script
+"\u0420\u0438\u0447\u0430\u0440\u0434 \u0414. \u0414\u0436\u0435\u0439\u043C\u0441 Aphex Twin"
+#.encode('utf8') to get around unicode errors?
 """
+# u"город" (city)
+# u prefix is needed for cyrillic to work
 input_text = CAPTION
 if TRANSLATE and CAPTION is not DEFAULT_CAPTION:
     input_text = translate(CAPTION)
 else:
     print_cyan(f'prompt: {CAPTION}')
+
 
 """
 If you *really* want to make a 9 or 25 image collage but have a weak CPU, you can try turning on low mem mode. 
@@ -217,7 +201,7 @@ XIB NOTE: the above four "constants" are the only valid values for IMAGE_AMOUNT
 """
 IMAGE_AMOUNT = ONE_IMAGE
 
-""" XIB NOTE: always leave this True, to generate images use generate.py instead """
+""" To generate images use generate.py instead """
 TRAIN = True
 ##############################################################
 
