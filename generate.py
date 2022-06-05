@@ -17,26 +17,31 @@ from rudalle.image_prompts import ImagePrompts
 from rudalle.pipelines import generate_images, super_resolution
 from prompt_translate import translate
 from postfx import apply_to_pil
+import yaml
+
+with open(f'config.yaml', 'r') as f:
+    cfg = yaml.load(f, Loader=yaml.FullLoader)
 
 # ############ ARGS HERE ################
 DEFAULT_CAPTION = "\u0420\u0438\u0447\u0430\u0440\u0434 \u0414. \u0414\u0436\u0435\u0439\u043C\u0441 Aphex Twin"
-CAPTION = 'illustration of a city in a veil of fog'
-TRANSLATE = True
-MODEL_NAME = 'City'
-CHECKPOINT_PATH = f'checkpoints/{MODEL_NAME}.pt'  # put None to use Malevich XL straight-up
+CAPTION = cfg['gen_prompt'] if cfg['gen_prompt'] else DEFAULT_CAPTION
+TRANSLATE = cfg['translate']
+MODEL_NAME = cfg['gen_model'] if cfg['gen_model'] else 'Malevich'
+CHECKPOINT_PATH = f'checkpoints/{MODEL_NAME}.pt' if cfg['gen_model'] else None
 OUTPUT_PATH = f'content/output/{MODEL_NAME}'
-FILE_NAME = f'{MODEL_NAME}_{CAPTION}'
-PROMPT_PATH = None  # f'content/Data/{MODEL_NAME}/Prompt'
-TOP_P = [0.999]
+FILE_NAME = cfg['file_name'] if cfg['file_name'] else CAPTION
+PROMPT_PATH = f"content/Data/{MODEL_NAME}/Prompt" if cfg['use_image_prompts'] else None
+TEMPERATURE = cfg['temperature']
+SHUFFLE_START = cfg['shuffle_start']
+SHUFFLE_ON_LOOP = cfg['shuffle_loop']
+IMAGE_COUNT = cfg['image_count']
+SUPER_RESOLUTION = cfg['super_res']
+SR = cfg['upscale']
+
+POST_FX = cfg['post_fx']
+INCREMENT_FROM = 0  # increment file name number from here
 TOP_K = 2048
-TEMPERATURE = [1.05, 1.0, 0.95, 0.9, 1.1]
-SHUFFLE_START = True  # shuffle initial lists
-SHUFFLE_ON_LOOP = True  # if looping around, shuffle lists
-IMAGE_COUNT = 4
-SUPER_RESOLUTION = True
-SR = 'x4'  # x8, x4, or x2
-INCREMENT_FROM = 0
-POST_FX = True
+TOP_P = [0.999]
 # ######################################
 
 
@@ -135,7 +140,12 @@ for i in tqdm(range(IMAGE_COUNT), colour='green'):
     for n in range(len(pil_images)):
         pil_images[n].save(save_path)
         if POST_FX:
-            apply_to_pil(pil_images[n], output_path, save_name + '_fx')
+            apply_to_pil(pil_images[n], output_path, save_name + '_fx',
+                         noise_strength=cfg['noise_strength'],
+                         clip_limit=cfg['clip_limit'],
+                         sigma_a=cfg['sigma_a'],
+                         sigma_b=cfg['sigma_b']
+                         )
 
 gc.collect()
 torch.cuda.empty_cache()
