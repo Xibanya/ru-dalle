@@ -3,12 +3,16 @@ train_model: City
 train_prompt:
 translate: True
 resume: True
+universe: Custom  # options: Low, Medium, High, Custom
 custom_lr: 1.0e-6
 epochs: 1
 warmup_steps: 50
 log_epoch: 1
-preview_epoch: 1
 save_epoch: 10
+preview_epoch: 1  # <=0 to not generate any preview per epoch
+preview_steps: 0  # <=0 to not generate any preview per step
+preview_super_res: True
+data_desc:  # options: add, append, override, none
 
 # IMAGE GENERATION
 gen_model: City
@@ -24,10 +28,19 @@ temperature:
   - 0.95
   - 0.9
   - 1.1
+top_p:
+  - 0.999
+top_k:
+  - 2048
+  - 1024
+  - 512
+seed: False
+gen_seed: 42
 super_res: True  # upscale with realesrgan
 upscale: x4  # x8, x4, or x2. Probably will get OOM with x8
 ## post fx
 post_fx: False
+save_both: True
 noise: speckle  # options: gaussian, localvar, poisson, salt, pepper, s&p, speckle
 noise_strength: 0.5
 clip_limit: 0.002
