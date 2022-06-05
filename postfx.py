@@ -22,11 +22,11 @@ class Noise:
     SPECKLE = "speckle"
 
 
-BLUR_SIGMA = [1, 0.5]  # [1, 0.5] seems to work well for city images
-EXPOSURE = 0.01  # 0.0005 seems to work well for the city images
-
-NOISE = Noise.GAUSSIAN
-NOISE_STRENGTH = 0.75
+SIGMA_A = 1
+SIGMA_B = 0.5
+EXPOSURE = 0.0005  # 0.0005 seems to work well for the city images
+NOISE = Noise.SPECKLE
+NOISE_STRENGTH = 0.5
 BLEND = 1  # lower values seem to work well for city images
 
 
@@ -38,33 +38,35 @@ def inv_lerp(a: float, b: float, v: float) -> float:
     return (v - a) / (b - a)
 
 
-def do_gauss(im, index: int):
-    return gaussian(im, sigma=BLUR_SIGMA[index], mode="reflect",
+def do_gauss(im, sigma: float):
+    return gaussian(im, sigma=sigma, mode="reflect",
                     preserve_range=True, multichannel=True, truncate=4.0)
 
 
 def load_and_apply(path: str):
     original = io.imread(str(path)) / 255.0
-    processed = do_gauss(original, 0)
+    processed = do_gauss(original, SIGMA_A)
     processed = skimage.util.random_noise(processed, mode=NOISE, clip=True)
     processed = exposure.equalize_adapthist(processed, clip_limit=EXPOSURE)
-    processed = do_gauss(processed, 1)
+    processed = do_gauss(processed, SIGMA_B)
     if BLEND < 1:
         processed = np.ubyte(BLEND * processed * 255 + (1 - BLEND) * original * 255)
     io.imsave(f"{path.split('.')[0]}_fx.png", processed)
 
 
 def apply_to_pil(pil_image: Image, output_path, save_name: str,
-                 noise=NOISE, noise_strength=NOISE_STRENGTH, blend=BLEND):
+                 noise=NOISE, noise_strength=NOISE_STRENGTH,
+                 clip_limit=EXPOSURE,
+                 blend=BLEND, sigma_a=SIGMA_A, sigma_b=SIGMA_B):
     original = pil_to_ndarray(pil_image) / 255.0
-    processed = do_gauss(original, 0)
+    processed = do_gauss(original, sigma_a)
     with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
     if noise_strength < 1:
         processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
     else:
         processed = with_noise
-    processed = exposure.equalize_adapthist(processed, clip_limit=EXPOSURE)
-    processed = do_gauss(processed, 1)
+    processed = exposure.equalize_adapthist(processed, clip_limit=clip_limit)
+    processed = do_gauss(processed, sigma_b)
     if blend < 1:
         processed = np.ubyte(blend * processed * 255 + (1 - blend) * original * 255)
     fx_path = pathlib.Path(os.path.join(output_path, save_name + '.png'))
