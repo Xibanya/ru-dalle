@@ -1,5 +1,5 @@
 # MODEL TRAINING
-train_model: Botan
+train_model: City
 train_prompt:
 translate: True
 resume: True
@@ -11,11 +11,11 @@ preview_epoch: 1
 save_epoch: 10
 
 # IMAGE GENERATION
-gen_model: Botan
-gen_prompt: 'an anime character'
-file_name: Botan-Hiei  # saved images will be prefixed with this, will use prompt if blank
-use_image_prompts: True  # requires images in content/Data/{MODEL_NAME}/Prompt
-image_count: 2  # how many images to generate
+gen_model: City
+gen_prompt: 'a screenshot of an anime city matte painting'
+file_name:  # saved images will be prefixed with this, will use prompt if blank
+use_image_prompts: False  # requires images in content/Data/{MODEL_NAME}/Prompt
+image_count: 4  # how many images to generate
 shuffle_start: True  # shuffle initial lists
 shuffle_loop: True  # if looping around, shuffle lists
 temperature:
