@@ -1,11 +1,34 @@
-resume: True  # False to start a new model, setting False will overwrite the existing model if present
-model_name: City
-caption: 'an illustration of a City'
-use_default_caption: False
+# MODEL TRAINING
+train_model: City
+train_prompt:
 translate: True
+resume: True
 custom_lr: 1.0e-6
 epochs: 1
 warmup_steps: 50
 log_epoch: 1
 preview_epoch: 1
 save_epoch: 10
+
+# IMAGE GENERATION
+gen_model: City
+gen_prompt: 'an illustration of a city'
+file_name:  # saved images will be prefixed with this, will use prompt if blank
+use_image_prompts: False  # requires images in content/Data/{MODEL_NAME}/Prompt
+image_count: 4  # how many images to generate
+shuffle_start: True  # shuffle initial lists
+shuffle_loop: True  # if looping around (more images are being generated than are list items), shuffle lists
+temperature:
+  - 1.05
+  - 1.0
+  - 0.95
+  - 0.9
+  - 1.1
+super_res: True  # upscale with realesrgan
+upscale: x4  # x8, x4, or x2. Probably will get OOM with x8
+## post fx
+post_fx: True
+noise_strength: 0.5
+clip_limit: 0.002
+sigma_a: 1
+sigma_b: 0.25
