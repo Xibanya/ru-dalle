@@ -39,6 +39,8 @@ def inv_lerp(a: float, b: float, v: float) -> float:
 
 
 def do_gauss(im, sigma: float):
+    if sigma <= 0:
+        return im
     return gaussian(im, sigma=sigma, mode="reflect",
                     preserve_range=True, multichannel=True, truncate=4.0)
 
