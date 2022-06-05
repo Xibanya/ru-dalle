@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 NOTE FROM XIBANYA:
-This was an attempt to get Looking Glass v1.1
-https://colab.research.google.com/drive/11vdS9dpcZz2Q2efkOjcwyax4oob6N40G?usp=sharing
-working locally. This code is mostly the cells from the colab notebook pasted in and
-cleaned up, with some changes to solve exceptions I was receiving locally that
-didn't occur in the notebook.
-
-note most of the Looking Glass v1.1 notebook is derived from this notebook from the dalle repo:
+most of this code is derived from this notebook:
 https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sharing#scrollTo=g2j_g_T7wiQd
+
+Most of my comments are attributed to me directly in some way. If they aren't, 
+they're probably from the original notebook (ie, not written by me)
+Direct any questions or comments thusly?
 """
 import csv
 import datetime
@@ -41,63 +39,72 @@ from torch.utils.data import Dataset, DataLoader
 from torch.optim import lr_scheduler, adam
 from tqdm import tqdm
 from transformers import AdamW
-
-
-from rudalle import get_rudalle_model, get_tokenizer, get_vae
+import yaml
+from rudalle import get_rudalle_model, get_tokenizer, get_vae, get_realesrgan
 from rudalle import utils
 from rudalle.dalle.utils import exists, is_empty
-from rudalle.pipelines import generate_images, show
+from rudalle.pipelines import generate_images, show, super_resolution
 
 from colors import print_cyan, print_blue, print_green, print_warn
+from prompt_translate import translate
 
+with open(f'config.yaml', 'r') as f:
+    cfg = yaml.load(f, Loader=yaml.FullLoader)
 
 #####################################################
-""" 
-XIB NOTE: CUSTOM PARAMETERS HERE 
-when there are this many parameters I always run scripts like this from 
-the IDE rather than CLI and imo it's just easier to tweak this kinda stuff
-either in-code or in a yaml file. Keeping all this in one python script
-so it's easier to share
 """
+XIB NOTE:
+generally you won't need to mess with these parameters directly, 
+you'll really only want to use the params surfaced in config.yaml.
 
+The structure here assumes that your model will be at 'checkpoints/[model name]'
+the training dataset for your model will be found at 'content/Data/[model name]'
+and the generated output should be saved to 'content/output/[model name'
 """
-XIB NOTE: if true, looks for a checkpoint in directory 
-'checkpoints/{RESUME_FROM}.pt'
-"""
-RESUME = True
-RESUME_FROM = 'nature_last' #'rudalle_dalle_last'
-TRAIN = False
+MODEL_NAME = cfg['model_name']
 SAVE_PATH = 'checkpoints/'
-MODEL_NAME = 'nature'
-OUTPUT_FOLDER = 'Nature'
-"""
-if true has a visualization of the training loss pop up; 
-execution of the script halts until you dissmiss it.
-"""
-SHOW_TRAINING_PLOTS = False
+OUTPUT_FOLDER = MODEL_NAME
+INPUT_FOLDER = 'Data/' + MODEL_NAME
 
 """
-XIB NOTE: DON'T CHANGE THESE
+XIB NOTE: if RESUME is true, model is loaded from 
+'checkpoints/{RESUME_FROM}.pt'
+Only RESUME_FROM to something other than MODEL_NAME if you want to 
+resume from an existing model without overwriting it
 """
-ONE_IMAGE = "1 image"
-FOUR_IMAGES = "4 images"
-NINE_IMAGES = "9 images"
-TWENTY_FIVE_IMAGES = "25 images"
+RESUME = cfg['resume']
+RESUME_FROM = MODEL_NAME
+
+""" 
+XIB NOTE: probably use DEFAULT_CAPTION when TRANSLATE is False but you don't wanna make up an actual Russian caption?
 """
-XIB NOTE: the above four "constants" are the only valid values for IMAGE_AMOUNT
+DEFAULT_CAPTION = "\u0420\u0438\u0447\u0430\u0440\u0434 \u0414. \u0414\u0436\u0435\u0439\u043C\u0441 Aphex Twin"
+CAPTION = cfg['caption'] if not cfg['use_default_caption'] else DEFAULT_CAPTION
+SAVE_NAME = CAPTION  # file name prefix for the saved images
+# set to false if all the translation API calls for the day have been used up or input is in Russian already
+TRANSLATE = cfg['translate']
 """
-IMAGE_AMOUNT = ONE_IMAGE
-LOW = "Low"
-MEDIUM = "Medium"
-HIGH = "High"
+XIB NOTE:
+You can specify a caption per input file by putting a data_desc.csv 
+file in 'content/Data/[model name]' but this is optional. Any image
+without an individual description will be fed into the model with
+the description assigned to CAPTION (translated, if TRANSLATE is True)
+"""
+INDIVIDUAL_DESCRIPTION_FILE = 'data_desc.csv'  # leave as 'data_desc.csv' if none
+
+""" XIB NOTE: these are constants, don't change these! """
+LOW = "Low"  # 1e-5
+MEDIUM = "Medium"  # 2e-5
+HIGH = "High"  # 1e-4
 CUSTOM = "Custom"
+
 """
 Universe similarity determines how close to the original images you will receive. 
 High similarity produces alternate versions of an image, low similarity produces 
 "variations on a theme".
 """
-universe_similarity = CUSTOM
-CUSTOM_LEARNING_RATE = 1e-6
+CUSTOM_LEARNING_RATE = float(cfg['custom_lr'])
+universe_similarity = MEDIUM
 width = 256
 height = 256
 BATCH_SIZE = 1
@@ -106,17 +113,33 @@ The amount of epochs that training occurs for.
 Turn down if the images are too similar to the base image. 
 Turn up if they're too different. Use this for fine adjustments.
 """
-EPOCH_AMOUNT = 5
-WARMUP_STEPS = 50
+EPOCH_AMOUNT = cfg['epochs']
+WARMUP_STEPS = cfg['warmup_steps']
+
 """
 XIB NOTE: this prints epoch number when iterating over epochs
+set to <= 0 to not use
 """
-LOG_EPOCH = 10
-SAVE_EVERY = 100
+LOG_EPOCH = cfg['log_epoch']
+
+"""
+XIB NOTE: Generates an image every PREVIEW_EPOCH epochs
+set to <= 0 to not use
+"""
+PREVIEW_EPOCH = cfg['preview_epoch']
+
+"""
+XIB NOTE: saves checkpoint every SAVE_EVERY epochs (saves checkpoint at end regardless)
+set to <= 0 to not use
+"""
+SAVE_EPOCH = cfg['save_epoch']
+
 """
 XIB NOTE: put this in a /content directory
+Only used if multiple_image_tuning is False
 """
 INPUT_IMAGE = "testpic.png"
+
 """
 Multiple Image Tuning
 Set this variable to "True" to enable Multiple Image Tuning.
@@ -128,7 +151,13 @@ multiple_image_tuning = True
 If the folder has no images or `folder_to_train` is `""`, Multiple Image Tuning will be skipped
 even if multiple_image_tuning is True
 """
-folder_to_train = "Data/Nature"
+folder_to_train = INPUT_FOLDER
+
+"""
+if true has a visualization of the training loss pop up; 
+execution of the script halts until you dissmiss it.
+"""
+SHOW_TRAINING_PLOTS = False
 
 """
 Input text can influence the end result you get to a minor degree, so you have the 
@@ -136,19 +165,12 @@ option to change it now.
 THIS MUST HAVE AT LEAST ONE CHARACTER IN IT IN IT OTHERWISE THE FINE-TUNING WILL BREAK.
 Input text **must be in Russian**. You do not need to change this, though, 
 unless you are a perfectionist.
-
-XIB NOTE: this is the original prompt from bearsharktopus's notebook but to use it here
-you have to encode/decode to utf8. the provided prompt is the same thing but in latin script
-"\u0420\u0438\u0447\u0430\u0440\u0434 \u0414. \u0414\u0436\u0435\u0439\u043C\u0441 Aphex Twin"
-#.encode('utf8') to get around unicode errors?
 """
-readable_caption = 'nature'  # this is just for output file name
-# u"город"
-# u"Сэйлор Мун"
-# u"мультяшный кот"
-# u"город на закате"
-# u prefix is needed for cyrillic to work
-input_text = u"природа"
+input_text = CAPTION
+if TRANSLATE and CAPTION is not DEFAULT_CAPTION:
+    input_text = translate(CAPTION)
+else:
+    print_cyan(f'prompt: {CAPTION}')
 
 """
 If you *really* want to make a 9 or 25 image collage but have a weak CPU, you can try turning on low mem mode. 
@@ -183,6 +205,20 @@ ADAMW = 'AdamW'
 ADAM = 'Adam'
 OPTIMIZER = ADAMW
 
+"""
+XIB NOTE: DON'T CHANGE THESE
+"""
+ONE_IMAGE = "1 image"
+FOUR_IMAGES = "4 images"
+NINE_IMAGES = "9 images"
+TWENTY_FIVE_IMAGES = "25 images"
+"""
+XIB NOTE: the above four "constants" are the only valid values for IMAGE_AMOUNT
+"""
+IMAGE_AMOUNT = ONE_IMAGE
+
+""" XIB NOTE: always leave this True, to generate images use generate.py instead """
+TRAIN = True
 ##############################################################
 
 # XIB NOTE: these shenanigans to prevent cuda not initialized errors
@@ -212,13 +248,14 @@ if info.total > 16252636672:
 else:
     print_warn('Potential OOM issues?')
 
-
 device = 'cuda'
 model = get_rudalle_model('Malevich', pretrained=True, fp16=True, device=device)
 if RESUME:
     model_path = os.path.join(SAVE_PATH, f"{RESUME_FROM}.pt")
     model.load_state_dict(torch.load(model_path))
-    print(f'Loaded from {model_path}')
+    print_blue(f'Loaded pretrained model from {model_path}')
+else:
+    print_blue('Loaded default Malevich model')
 
 vae = get_vae().to(device)
 tokenizer = get_tokenizer()
@@ -236,14 +273,14 @@ else:
     learning_rate = CUSTOM_LEARNING_RATE
 
 if TRAIN:
-    print_cyan(f'learning rate: {learning_rate}')
+    print_cyan(f'Universe similarity: {universe_similarity}, learning rate: {learning_rate}')
 
 
 def save_images(image_data, suffix: str):
     for j in range(len(image_data)):
         s_folder = 'content/output/' + folder_to_train + '/'
         pathlib.Path(s_folder).mkdir(parents=True, exist_ok=True)
-        s_name = f"{folder_to_train}_{readable_caption}_{str(n)}{suffix}"
+        s_name = f"{folder_to_train}_{CAPTION}_{str(n)}{suffix}"
         s_path = pathlib.Path(os.path.join(s_folder, s_name + '.png'))
         if pathlib.Path.exists(s_path):
             s_name = s_name + datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -258,7 +295,7 @@ class Args:
         self.epochs = epoch_amt
         self.save_path = SAVE_PATH
         self.model_name = MODEL_NAME
-        self.save_every = SAVE_EVERY
+        self.save_every = SAVE_EPOCH
         self.prefix_length = 10
         self.bs = BATCH_SIZE
         self.clip = 0.25
@@ -278,7 +315,6 @@ low_mem = True if resize else False
 
 w = round(width / 8)
 h = round(height / 8)
-
 
 files_to_train = []
 types = ('*.png', '*.jpg', "*.jpeg", "*.bmp")
@@ -302,12 +338,23 @@ with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
 file_to_train = "/content/" + file_to_train
 
 if multiple_image_tuning:
+    data_folder = f'content/{INPUT_FOLDER}'
+    data_file_path = pathlib.Path(os.path.join(data_folder, INDIVIDUAL_DESCRIPTION_FILE))
+    if pathlib.Path.exists(data_file_path):
+        with open(data_file_path, mode='r') as infile:
+            reader = csv.reader(infile)
+            desc_dict = {rows[0]: translate(rows[1]) for rows in reader}
+    else:
+        desc_dict = {'file': 'desc'}
     with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerow(['', 'name', 'caption'])
         for i in range(len(files_to_train)):
             files_to_train[i] = files_to_train[i].replace("content/" + folder_to_train + "\\", "")
-            spamwriter.writerow([i, files_to_train[i], input_text])
+            if files_to_train[i] in desc_dict.keys():
+                spamwriter.writerow([i, files_to_train[i], desc_dict[files_to_train[i]]])
+            else:
+                spamwriter.writerow([i, files_to_train[i], input_text])
 
 
 def load_image(file_path, img_name):
@@ -397,7 +444,6 @@ elif OPTIMIZER == ADAM:
 else:
     optimizer = AdamW(model.parameters(), lr=learning_rate)
 
-
 scheduler = lr_scheduler.OneCycleLR(
     optimizer=optimizer,
     max_lr=learning_rate,
@@ -437,16 +483,17 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
     """
     loss_logs = []
     try:
-        progress = tqdm(total=len(t_dataloader), desc='finetuning')
+        progress = tqdm(total=len(t_dataloader) * argz.epochs, desc='finetuning')
         save_counter = 0
         for epoch in range(argz.epochs):
-            if (epoch + 1) % LOG_EPOCH == 0:
+
+            if LOG_EPOCH > 0 and (epoch + 1) % LOG_EPOCH == 0:
                 print_blue(f"\nEpoch {epoch + 1}")
 
             for data_text, images in train_dataloader:
                 save_counter += 1
                 model.zero_grad()
-                devi = model.get_param('device')
+                devi = t_model.get_param('device')
                 attention_mask = torch.tril(
                     torch.ones((argz.bs,
                                 1,
@@ -461,25 +508,38 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
                 loss = loss["image"]
                 # train step
                 loss.backward()
-
                 torch.nn.utils.clip_grad_norm_(model.parameters(), argz.clip)
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-
-                # save every here
-                if (epoch + 1) % argz.save_every == 0:
-                    print_green(f'Saving checkpoint here {argz.model_name}_{save_counter}.pt')
-                    torch.save(
-                        model.state_dict(),
-                        os.path.join(argz.save_path, f"{argz.model_name}_{save_counter}.pt")
-                    )
-                    if SHOW_TRAINING_PLOTS:
-                        plt.plot(loss_logs)
-                        plt.show()
                 loss_logs += [loss.item()]
                 progress.update()
                 progress.set_postfix({"loss": loss.item()})
+
+            if SAVE_EPOCH > 0 and (epoch + 1) % SAVE_EPOCH == 0:
+                print_green(f'Saving checkpoint here {argz.model_name}_{save_counter}.pt')
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(argz.save_path, f"{argz.model_name}_{save_counter}.pt")
+                )
+                if SHOW_TRAINING_PLOTS:
+                    plt.plot(loss_logs)
+                    plt.show()
+            if PREVIEW_EPOCH > 0 and (epoch + 1) % PREVIEW_EPOCH == 0:
+                preview_images, _ = generate_images(text=input_text, tokenizer=tokenizer, dalle=model,
+                                                    vae=vae, images_num=1, top_k=2048, top_p=0.999)
+                preview_index = 0
+                preview_name = f'{MODEL_NAME}_epoch{epoch + 1}_{preview_index:03d}'
+                out_folder = f'content/output/{OUTPUT_FOLDER}'
+                preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
+
+                for p in range(len(preview_images)):
+                    while pathlib.Path.exists(preview_save_path):
+                        preview_index = preview_index + 1
+                        preview_name = f'{MODEL_NAME}_epoch{epoch + 1}_{preview_index:03d}'
+                        preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
+                    preview_images[p].save(preview_save_path)
+                    print_blue(f"\nSaved preview image to {preview_save_path}")
 
         if SHOW_TRAINING_PLOTS and EPOCH_AMOUNT % argz.save_every != 0:
             plt.plot(loss_logs)
@@ -487,9 +547,9 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
 
         torch.save(
             model.state_dict(),
-            os.path.join(argz.save_path, f"{argz.model_name}_last.pt")
+            os.path.join(argz.save_path, f"{argz.model_name}.pt")
         )
-        print_green(f'\nTuned and saved here: {argz.model_name}_last.pt')
+        print_green(f'\nTuned and saved here: {argz.model_name}.pt')
 
     except KeyboardInterrupt:
         print_warn(f'What for did you stopped? Please change model_path '
@@ -534,7 +594,7 @@ def forward(
     # some hardcode :)
     text = F.pad(text, (1, 0), value=2)
     text_embeddings = self.text_embeddings(text) + \
-        self.text_pos_embeddings(torch.arange(text.shape[1], device=self.device))
+                      self.text_pos_embeddings(torch.arange(text.shape[1], device=self.device))
 
     image_input_ids = input_ids[:, self.text_seq_length:]
 
@@ -840,20 +900,25 @@ for i in range(collage_amount):
                 pil_images += _pil_images
 
     if multiple_image_tuning:
+        realesrgan = get_realesrgan('x4', device='cuda')
+        pil_images = super_resolution(pil_images, realesrgan)
         file_to_train = folder_to_train + "/" + random.choice(files_to_train)
         for n in range(len(pil_images)):
             save_folder = 'content/output/' + OUTPUT_FOLDER + '/'
             pathlib.Path(save_folder).mkdir(parents=True, exist_ok=True)
-            save_name = f"{readable_caption}_{str(n)}"
+            save_index = 0
+            save_name = f'{SAVE_NAME}_Train_{save_index:03d}'
             save_path = pathlib.Path(os.path.join(save_folder, save_name + '.png'))
-            if pathlib.Path.exists(save_path):
-                save_name = save_name + datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-            print_cyan(f'attempting to save {save_name}')
+            while pathlib.Path.exists(save_path):
+                save_index = save_index + 1
+                save_name = f'{SAVE_NAME}_Train_{save_index:03d}'
+                save_path = pathlib.Path(os.path.join(save_folder, save_name + '.png'))
+            print_cyan(save_path)
             pil_images[n].save(save_folder + save_name + '.png')
     else:
         ft = file_to_train.split('/')[-1]
         for n in range(len(pil_images)):
-            pil_images[n].save(f"content/output/{readable_caption}_{str(n)}_{ft}")
+            pil_images[n].save(f"content/output/{SAVE_NAME}_Train_{str(n)}_{ft}")
 
     if not multiple_image_tuning and not skip_gt:
         img_path = f"content\\{INPUT_IMAGE}"
