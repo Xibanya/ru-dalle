@@ -1,21 +1,29 @@
 # Local ruDalle
 The purpose of this repository is to offer an easy way to use ruDalle directly from an IDE such as pyCharm, cuz constantly running a process with a buncha arguments in the command line sux.
 
-HOW TO USE
+## HOW TO USE
 
-## To Train A Model
+### To Train A Model
 1. Download the repository (if you haven't already!)
 2. Put images in content/Data/name-of-your-model
 3. Update config.yaml with the name of your model, caption that describes your dataset, and how many epochs you want to train for
 4. run main.py
 
-## To generate images
+for extra fine control over training, you can put a data_desc.csv file in the data folders to overwrite or append captions to individual images.
+
+### To generate images
 1. Download the repository (if you haven't already!)
 2. Train a model (optional)
 3. Update config.yaml with the name of your model or leave blank to use Malevich XL; set text prompt, location of image prompts, number of images to generate, etc
 4. run generate.py
 
-## Pretrained models
+## Xibanya's Pretrained models
+these area all finetuned from Malevich XL and are thus compatible with any implementation of ruDalle
+
+[Anime Cities Malevich](https://huggingface.co/Xibanya/City)
+
+<img src="https://huggingface.co/Xibanya/City/resolve/main/Pics/city-examples-sm.png" width="512" height="512">
+
 [Anime Sunset Malevich](https://huggingface.co/Xibanya/sunset_city)
 
 <img src="https://huggingface.co/Xibanya/sunset_city/resolve/main/citysunset.png" width="256" height="256">
