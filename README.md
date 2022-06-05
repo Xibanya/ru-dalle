@@ -1,14 +1,19 @@
-# Local Lookingglass
-This was an attempt to get Looking Glass v1.1
-https://colab.research.google.com/drive/11vdS9dpcZz2Q2efkOjcwyax4oob6N40G?usp=sharing
-working locally. This code is mostly the cells from the colab notebook pasted in and
-cleaned up, with some changes to solve exceptions I was receiving locally that
-didn't occur in the notebook.
+# Local ruDalle
+The purpose of this repository is to offer an easy way to use ruDalle directly from an IDE such as pyCharm, cuz constantly running a process with a buncha arguments in the command line sux.
 
-note most of the Looking Glass v1.1 notebook is derived from this notebook from the dalle repo:
-https://colab.research.google.com/drive/1Tb7J4PvvegWOybPfUubl5O7m5I24CBg5?usp=sharing#scrollTo=g2j_g_T7wiQd
+HOW TO USE
 
-This repo also includes some cool new features and utils written by me!
+## To Train A Model
+1. Download the repository (if you haven't already!)
+2. Put images in content/Data/name-of-your-model
+3. Update config.yaml with the name of your model, caption that describes your dataset, and how many epochs you want to train for
+4. run main.py
+
+## To generate images
+1. Download the repository (if you haven't already!)
+2. Train a model (see above)
+3. update the values in the ARGS section of generate.py with the name of your model, caption you want to use, how many images to generate, etc
+4. run generate.py
 
 ## Pretrained models
 [Anime Sunset Malevich](https://huggingface.co/Xibanya/sunset_city)
