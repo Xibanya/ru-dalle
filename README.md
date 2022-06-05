@@ -28,11 +28,12 @@ The rest of this readme is from the original ru-dalle repo
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/sberbank-ai/ru-dalle/master.svg)](https://results.pre-commit.ci/latest/github/sberbank-ai/ru-dalle/master)
 
 ```
-pip install rudalle==1.0.0
+pip install rudalle==1.1.0rc0
 ```
 ### 🤗 HF Models:
 [ruDALL-E Malevich (XL)](https://huggingface.co/sberbank-ai/rudalle-Malevich) \
-[ruDALL-E Emojich (XL)](https://huggingface.co/sberbank-ai/rudalle-Emojich) (readme [here](https://github.com/sberbank-ai/ru-dalle/blob/master/Emojich.md))
+[ruDALL-E Emojich (XL)](https://huggingface.co/sberbank-ai/rudalle-Emojich) (readme [here](https://github.com/sberbank-ai/ru-dalle/blob/master/Emojich.md)) \
+[ruDALL-E Surrealist (XL)](https://huggingface.co/shonenkov-AI/rudalle-xl-surrealist)
 
 
 ### Minimal Example:
@@ -106,3 +107,35 @@ skyes = [red_sky, sunny_sky, cloudy_sky, night_sky]
 ```
 ![](pics/malevich/russian-temple-image-prompt.png)
 
+
+### VideoDALL-E | ru[CogVideo](https://github.com/THUDM/CogVideo) by [@cene555](https://github.com/cene555)
+**Video generation example**
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1A_3Oe9r9DP3Ayd6DPvqKHIKlwNfLhVP5?usp=sharing)
+**Finetuning example**
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1R_joYWlvToA24tsa9BFYa2D6ffiMtyVy?usp=sharing)
+
+
+### Aspect ratio images [**-->NEW<--**](https://github.com/shonenkov-AI/rudalle-aspect-ratio)
+
+![](https://raw.githubusercontent.com/shonenkov-AI/rudalle-aspect-ratio/main/pics/h_example.jpg)
+
+
+
+### 🚀 Contributors 🚀
+
+- [@bes](https://github.com/bes-dev) shared [great idea and realization with IDWT](https://github.com/bes-dev/vqvae_dwt_distiller.pytorch) for decoding images with higher quality 512x512! 😈💪 thanks a lot for your constructive advices, appreciate it
+- [@neverix](https://www.kaggle.com/neverix) thanks a lot for contributing for speed up of inference
+- [@Igor Pavlov](https://github.com/boomb0om) trained model and prepared code with [super-resolution](https://github.com/boomb0om/Real-ESRGAN-colab)
+- [@oriBetelgeuse](https://github.com/oriBetelgeuse) thanks a lot for easy API of generation using image prompt
+- [@Alex Wortega](https://github.com/AlexWortega) created first FREE version colab notebook with fine-tuning [ruDALL-E Malevich (XL)](https://huggingface.co/sberbank-ai/rudalle-Malevich) on sneakers domain 💪
+- [@Anton Lozhkov](https://github.com/anton-l) Integrated to [Huggingface Spaces](https://huggingface.co/spaces) with [Gradio](https://github.com/gradio-app/gradio), see [here](https://huggingface.co/spaces/anton-l/rudall-e)
+
+### Supported by
+
+[<img src="https://raw.githubusercontent.com/sberbank-ai/ru-dolph/master/pics/logo/airi-logo.png" height="50"/>](https://airi.net)
+
+
+### Social Media
+
+[![](./pics/habr_eng.svg)](https://habr.com/ru/company/sberbank/blog/589673/)
+[![](./pics/habr.svg)](https://habr.com/ru/company/sberdevices/blog/586926/)
