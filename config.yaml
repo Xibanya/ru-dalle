@@ -1,0 +1,11 @@
+resume: True  # false to start a new model, will overwrite the existing model if present
+model_name: City
+caption: 'an illustration of a City'
+use_default_caption: False
+translate: True
+custom_lr: 1.0e-6
+epochs: 1
+warmup_steps: 50
+log_epoch: 1
+preview_epoch: 1
+save_epoch: 10
