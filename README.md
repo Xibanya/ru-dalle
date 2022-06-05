@@ -11,8 +11,8 @@ HOW TO USE
 
 ## To generate images
 1. Download the repository (if you haven't already!)
-2. Train a model (see above)
-3. update the values in the ARGS section of generate.py with the name of your model, caption you want to use, how many images to generate, etc
+2. Train a model (optional)
+3. Update config.yaml with the name of your model or leave blank to use Malevich XL; set text prompt, location of image prompts, number of images to generate, etc
 4. run generate.py
 
 ## Pretrained models
