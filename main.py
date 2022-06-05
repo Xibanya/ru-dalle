@@ -27,7 +27,6 @@ import PIL
 import matplotlib.pyplot as plt
 import more_itertools
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
@@ -86,7 +85,7 @@ High similarity produces alternate versions of an image, low similarity produces
 "variations on a theme".
 """
 CUSTOM_LEARNING_RATE = float(cfg['custom_lr'])
-universe_similarity = MEDIUM
+universe_similarity = cfg['universe']
 width = 256
 height = 256
 BATCH_SIZE = 1
@@ -215,11 +214,11 @@ torch.nn.functional.conv2d(
 
 ram_gb = round(virtual_memory().total / 1024 ** 3, 1)
 
-print_cyan(f'CPU: {multiprocessing.cpu_count()}')
-print_cyan(f'RAM GB: {ram_gb}')
-print_cyan(f"PyTorch version: {torch.__version__}")
-print_cyan(f"CUDA version: {torch.version.cuda}")
-print_cyan(f"cuDNN version: {torch.backends.cudnn.version()}")
+print_blue(f'CPU: {multiprocessing.cpu_count()}')
+print_blue(f'RAM GB: {ram_gb}')
+print_blue(f"PyTorch version: {torch.__version__}")
+print_blue(f"CUDA version: {torch.version.cuda}")
+print_blue(f"cuDNN version: {torch.backends.cudnn.version()}")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print_cyan(f"device: {device.type}")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -243,6 +242,8 @@ else:
 
 vae = get_vae().to(device)
 tokenizer = get_tokenizer()
+
+realesrgan = get_realesrgan('x4', device='cuda')
 
 file_to_train = INPUT_IMAGE
 epoch_amt = EPOCH_AMOUNT
@@ -320,6 +321,7 @@ with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
     spamwriter.writerow(['', 'name', 'caption'])
     spamwriter.writerow(['0', file_to_train, input_text])
 file_to_train = "/content/" + file_to_train
+desc_dict = {'file': ['desc']}
 
 if multiple_image_tuning:
     data_folder = f'content/{INPUT_FOLDER}'
@@ -327,16 +329,28 @@ if multiple_image_tuning:
     if pathlib.Path.exists(data_file_path):
         with open(data_file_path, mode='r') as infile:
             reader = csv.reader(infile)
-            desc_dict = {rows[0]: translate(rows[1]) for rows in reader}
-    else:
-        desc_dict = {'file': 'desc'}
+            for row in reader:
+                val = translate(row[1])
+                if row[0] in desc_dict.keys():
+                    desc_dict[row[0]].append(val)
+                else:
+                    desc_dict[row[0]] = [val]
+    desc_dict.pop('file')
     with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerow(['', 'name', 'caption'])
         for i in range(len(files_to_train)):
             files_to_train[i] = files_to_train[i].replace("content/" + folder_to_train + "\\", "")
-            if files_to_train[i] in desc_dict.keys():
-                spamwriter.writerow([i, files_to_train[i], desc_dict[files_to_train[i]]])
+            if cfg['data_desc'] is not None and files_to_train[i] in desc_dict.keys():
+                if cfg['data_desc'] == 'append':
+                    single_desc = input_text
+                    for desc in desc_dict[files_to_train[i]]:
+                        single_desc = single_desc + f', {desc}'
+                    spamwriter.writerow([i, files_to_train[i], single_desc])
+                if cfg['data_desc'] == 'add':
+                    desc_dict[files_to_train[i]].append(input_text)
+                    for desc in desc_dict[files_to_train[i]]:
+                        spamwriter.writerow([i, files_to_train[i], desc])
             else:
                 spamwriter.writerow([i, files_to_train[i], input_text])
 
@@ -375,22 +389,16 @@ class RuDalleDataset(Dataset):
             T.ToTensor()
             # T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
-
-        df = pd.read_csv(csv_path)
-        # TODO: not this - Xib
         if not multiple_image_tuning:
             print_blue(f'appending {INPUT_IMAGE} to dataset')
             self.samples.append(["content", INPUT_IMAGE, input_text])
         else:
-            paths = []
-            for ex in types:
-                paths.extend(glob.glob(os.path.join("content/" + folder_to_train, ex)))
-            for path in paths:
-                path = path.replace('content/', '')
-                self.samples.append(["content", path, input_text])
-        for caption, f_path in zip(df['caption'], df['name']):
-            if 1 < len(caption) < 100 and os.path.isfile(f'{file_path}/{f_path}'):
-                self.samples.append([file_path, f_path, caption])
+            csv_samples = csv.reader(open(
+                file='data_desc.csv', encoding='utf-8', errors='ignore', mode="r"), delimiter=",")
+            for sample in csv_samples:
+                if sample[0] is None or sample[1] == 'name':
+                    continue
+                self.samples.append(['content', folder_to_train + '/' + sample[1], sample[2]])
         if shuffle:
             np.random.shuffle(self.samples)
 
@@ -460,6 +468,28 @@ def freeze(
     return model
 
 
+def make_preview_image(milestone_type: str, milestone: int):
+    preview_images, preview_scores = generate_images(
+        text=input_text, tokenizer=tokenizer, dalle=model,
+        vae=vae, images_num=1, top_k=2048, top_p=0.999)
+    if cfg['preview_super_res']:
+        preview_images = super_resolution(preview_images, realesrgan)
+    preview_index = 0
+    prefix = CAPTION if CAPTION is not None else MODEL_NAME
+    preview_name = f'{prefix}_{milestone_type}{milestone + 1}_{preview_index:03d}'
+    out_folder = f'content/output/{OUTPUT_FOLDER}'
+    preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
+
+    for p in range(len(preview_images)):
+        while pathlib.Path.exists(preview_save_path):
+            preview_index = preview_index + 1
+            preview_name = f'{prefix}_{milestone_type}{milestone + 1}_{preview_index:03d}'
+            preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
+        preview_images[p].save(preview_save_path)
+        print_blue(f"\nSaved preview image to {preview_save_path}")
+        print_green(f"Score: {int(preview_scores[p])}")
+
+
 def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
     """
     args - arguments for training
@@ -470,7 +500,6 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
         progress = tqdm(total=len(t_dataloader) * argz.epochs, desc='finetuning')
         save_counter = 0
         for epoch in range(argz.epochs):
-
             if LOG_EPOCH > 0 and (epoch + 1) % LOG_EPOCH == 0:
                 print_blue(f"\nEpoch {epoch + 1}")
 
@@ -499,6 +528,8 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
                 loss_logs += [loss.item()]
                 progress.update()
                 progress.set_postfix({"loss": loss.item()})
+                if cfg['preview_steps'] > 0 and (save_counter + 1) % cfg['preview_steps'] == 0:
+                    make_preview_image('step', save_counter)
 
             if SAVE_EPOCH > 0 and (epoch + 1) % SAVE_EPOCH == 0:
                 print_green(f'Saving checkpoint here {argz.model_name}_{save_counter}.pt')
@@ -510,40 +541,26 @@ def train(t_model, argz: Args, t_dataloader: RuDalleDataset):
                     plt.plot(loss_logs)
                     plt.show()
             if PREVIEW_EPOCH > 0 and (epoch + 1) % PREVIEW_EPOCH == 0:
-                preview_images, _ = generate_images(text=input_text, tokenizer=tokenizer, dalle=model,
-                                                    vae=vae, images_num=1, top_k=2048, top_p=0.999)
-                preview_index = 0
-                preview_name = f'{MODEL_NAME}_epoch{epoch + 1}_{preview_index:03d}'
-                out_folder = f'content/output/{OUTPUT_FOLDER}'
-                preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
-
-                for p in range(len(preview_images)):
-                    while pathlib.Path.exists(preview_save_path):
-                        preview_index = preview_index + 1
-                        preview_name = f'{MODEL_NAME}_epoch{epoch + 1}_{preview_index:03d}'
-                        preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
-                    preview_images[p].save(preview_save_path)
-                    print_blue(f"\nSaved preview image to {preview_save_path}")
-
-        if SHOW_TRAINING_PLOTS and EPOCH_AMOUNT % argz.save_every != 0:
-            plt.plot(loss_logs)
-            plt.show()
+                make_preview_image('epoch', epoch)
 
         torch.save(
             model.state_dict(),
             os.path.join(argz.save_path, f"{argz.model_name}.pt")
         )
         print_green(f'\nTuned and saved here: {argz.model_name}.pt')
+        if SHOW_TRAINING_PLOTS:
+            plt.plot(loss_logs)
+            plt.show()
 
     except KeyboardInterrupt:
-        print_warn(f'What for did you stopped? Please change model_path '
-                   f'to /{argz.save_path}{argz.model_name}_Failed_train.pt')
+        print_warn(f'Training interrupted by user. Model saved '
+                   f'to /{argz.save_path}{argz.model_name}_Interrupted.pt')
         plt.plot(loss_logs)
         plt.show()
 
         torch.save(
             model.state_dict(),
-            os.path.join(argz.save_path, f"{argz.model_name}_Failed_train.pt")
+            os.path.join(argz.save_path, f"{argz.model_name}_Interrupted.pt")
         )
     except Exception as err:
         print_warn(f'Failed with {err}')
@@ -655,12 +672,12 @@ model = freeze(freeze_emb=False,
                freeze_ff=True,
                freeze_other=False)  # freeze params to
 
+vae = get_vae().to(device)
 if TRAIN:
     train(model, args, t_dataloader=st)
 
 gc.collect()
 torch.cuda.empty_cache()
-vae = get_vae().to(device)
 
 
 def slow_decode(self, img_seq):
@@ -884,7 +901,6 @@ for i in range(collage_amount):
                 pil_images += _pil_images
 
     if multiple_image_tuning:
-        realesrgan = get_realesrgan('x4', device='cuda')
         pil_images = super_resolution(pil_images, realesrgan)
         file_to_train = folder_to_train + "/" + random.choice(files_to_train)
         for n in range(len(pil_images)):
