@@ -12,11 +12,53 @@ The purpose of this repository is to offer an easy way to use ruDalle directly f
 
 for extra fine control over training, you can put a data_desc.csv file in the data folders to overwrite or append captions to individual images.
 
-### How To generate images
+# Image Generation
+## How To generate images
 1. Download the repository (if you haven't already!)
 2. Have a model checkpoint in the checkpoints folder (optional)
 3. Update config.yaml with the name of your model or leave blank to use Malevich XL; set text prompt, location of image prompts, number of images to generate, etc
 4. run generate.py
+
+### Generation Config
+| Parameter | How to use |
+| ----------|------------|
+| `gen_model` | name of model in checkpoints folder (omit the .pt) |
+| `gen_prompt` | prompt for image generation (leave blank to use the default prompt from the original ruDalle colab notebook. Prompts are automatically translated to Russian so don't worry about that. |
+| `output_dir` | if left blank, output will be saved to content/output/your-models-name, use this to specify a subfolder of that directory to save stuff to |
+| `file_name` | If blank, the filenames of the generated images will be prefixed with the prompt. Otherwise they will be prefixed with this. |
+| `use_image_prompts` | if `True`, you must have images in content/Data/your-models-name/Prompt. These images will be used as prompts for image generation. If shuffle options below are enabled, image prompts will be randomized. |
+| `prompt_flip` | value between 0 and 1, probability of prompt image being flipped horizontally before being fed into the model |
+| `image_count` | how many images to generate. images are generated one at a time so you can put tons here without worrying about out of memory errors. |
+| `shuffle_start` | if `True`, before generating images, all lists are randomized |
+| `shuffle_loop` | if `True`, when generating more images than there are items in a list, shuffle the list every time it's been fully used. |
+| `seed` | if `True`, manually seeds with the value specified below |
+| `gen_seed` | User-provided seed for randomization. Used only if `seed` is `True` |
+| `temperature` | this is a list of possible temperatures to use for generation. If none of the shuffle options are `True`, these will be used in the order provided. |
+| `top_p` | this is a list of values for top p filtering. If no shuffle option is set to `True`, values will be used in order provided |
+| `top_k` | this is a list of values for top p filtering. If no shuffle option is set to `True`, values will be used in order provided |
+| `super_res` | if `True`, upscale output |
+| `upscale` | how much to upscale output by. Options are `x2`, `x4`, and `x8`, but I've never been able to use `x8` without getting out of memory errors. |
+
+## Post Effects! Wow!!
+When generating images you can opt to apply a little bit of post processing to them automatically. (The purpose being to make your anime cities, which you are of course generating, look more like old screenshots.)  This next image is unaltered output from the model.
+
+<img src="pics/original.png" width="512" height="512">
+
+Same image with `noise=speckle`, `noise_strength=0.5`, `clip_limit=0.005`, `sigma_a=1`, `sigma_b=1`
+
+<img src="pics/all.png" width="512" height="512">
+
+### PostFX Config
+| Parameter | How to use |
+| ----------|------------|
+| `post_fx`  | `True` to enable processing. If `False`, none of the other params matter. |
+| `save_both` | `True` to save both the original and processed image. `False` to save only the processed image. |
+| `noise` | noise type. Options are `gaussian`, `localvar`, `poisson`, `salt`, `pepper`, `s&p`, `speckle` (or blank to not use) |
+| `noise_strength` | put value between 0 and 1. How visible the noise is on the image. |
+| `clip_limit` | value between 0 and 1 for exposure adjustment (contrast). 0.005 is a good starting point. Bigger values = more contrasty |
+| `sigma_a` | value of blur applied before other effects. Can be any float but you'll probably want between 0 and 2 |
+| `sigma_b` | value of final blur applied after all other effects. Can be any float but you'll probably want between 0 and 2 |
+
 
 ## Xibanya's Pretrained models
 these area all finetuned from Malevich XL and are thus compatible with any implementation of ruDalle. If you use these, put them in the checkpoints folder.
