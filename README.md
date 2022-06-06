@@ -3,22 +3,23 @@ The purpose of this repository is to offer an easy way to use ruDalle directly f
 
 ## HOW TO USE
 
-### To Train A Model
+### How To Train A Model
 1. Download the repository (if you haven't already!)
-2. Put images in content/Data/name-of-your-model
-3. Update config.yaml with the name of your model, caption that describes your dataset, and how many epochs you want to train for
-4. run main.py
+2. Put a checkpoint you want to continue from in the checkpoints folder (optional)
+3. Put images in content/Data/name-of-your-model
+4. Update config.yaml with the name of your model, caption that describes your dataset, and how many epochs you want to train for
+5. run main.py
 
 for extra fine control over training, you can put a data_desc.csv file in the data folders to overwrite or append captions to individual images.
 
-### To generate images
+### How To generate images
 1. Download the repository (if you haven't already!)
-2. Train a model (optional)
+2. Have a model checkpoint in the checkpoints folder (optional)
 3. Update config.yaml with the name of your model or leave blank to use Malevich XL; set text prompt, location of image prompts, number of images to generate, etc
 4. run generate.py
 
 ## Xibanya's Pretrained models
-these area all finetuned from Malevich XL and are thus compatible with any implementation of ruDalle
+these area all finetuned from Malevich XL and are thus compatible with any implementation of ruDalle. If you use these, put them in the checkpoints folder.
 
 [Anime Cities Malevich](https://huggingface.co/Xibanya/City)
 
