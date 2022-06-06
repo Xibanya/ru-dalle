@@ -13,12 +13,14 @@ preview_epoch: 1  # <=0 to not generate any preview per epoch
 preview_steps: 0  # <=0 to not generate any preview per step
 preview_super_res: True
 data_desc:  # options: add, append, override, none
+flip_chance: 0.0  # when a training image is loaded, chance that it will be flipped horizontally
 
 # IMAGE GENERATION
 gen_model: City
 gen_prompt: 'a screenshot of an anime city matte painting'
 file_name:  # saved images will be prefixed with this, will use prompt if blank
 use_image_prompts: False  # requires images in content/Data/{MODEL_NAME}/Prompt
+prompt_flip: 0.1  # chance of a prompt image getting flipped horizontally
 image_count: 4  # how many images to generate
 shuffle_start: True  # shuffle initial lists
 shuffle_loop: True  # if looping around, shuffle lists
@@ -40,7 +42,7 @@ super_res: True  # upscale with realesrgan
 upscale: x4  # x8, x4, or x2. Probably will get OOM with x8
 ## post fx
 post_fx: False
-save_both: True
+save_both: True  # if True, save both the original image and the processed image. if False, save only the processed image
 noise: speckle  # options: gaussian, localvar, poisson, salt, pepper, s&p, speckle
 noise_strength: 0.5
 clip_limit: 0.002
