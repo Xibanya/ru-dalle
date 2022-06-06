@@ -45,21 +45,28 @@ def do_gauss(im, sigma: float):
                     preserve_range=True, multichannel=True, truncate=4.0)
 
 
-def load_and_apply(path: str):
+def load_and_apply(path: str, noise=NOISE, noise_strength=NOISE_STRENGTH,
+                   clip_limit=EXPOSURE, blend=BLEND, sigma_a: float = SIGMA_A, sigma_b: float = SIGMA_B,
+                   suffix='fx'):
     original = io.imread(str(path)) / 255.0
-    processed = do_gauss(original, SIGMA_A)
-    processed = skimage.util.random_noise(processed, mode=NOISE, clip=True)
-    processed = exposure.equalize_adapthist(processed, clip_limit=EXPOSURE)
-    processed = do_gauss(processed, SIGMA_B)
+    processed = do_gauss(original, sigma_a)
+    with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
+    if noise_strength < 1:
+        processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
+    else:
+        processed = with_noise
+    if clip_limit > 0:
+        processed = exposure.equalize_adapthist(processed, clip_limit=clip_limit)
+    processed = do_gauss(processed, sigma_b)
     if BLEND < 1:
-        processed = np.ubyte(BLEND * processed * 255 + (1 - BLEND) * original * 255)
-    io.imsave(f"{path.split('.')[0]}_fx.png", processed)
+        processed = np.ubyte(blend * processed * 255 + (1 - blend) * original * 255)
+    io.imsave(f"{path.split('.')[0]}_{suffix}.png", processed)
 
 
 def apply_to_pil(pil_image: Image, output_path, save_name: str,
                  noise=NOISE, noise_strength=NOISE_STRENGTH,
                  clip_limit=EXPOSURE,
-                 blend=BLEND, sigma_a=SIGMA_A, sigma_b=SIGMA_B):
+                 blend=BLEND, sigma_a: float = SIGMA_A, sigma_b: float = SIGMA_B):
     original = pil_to_ndarray(pil_image) / 255.0
     processed = do_gauss(original, sigma_a)
     with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
@@ -67,7 +74,8 @@ def apply_to_pil(pil_image: Image, output_path, save_name: str,
         processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
     else:
         processed = with_noise
-    processed = exposure.equalize_adapthist(processed, clip_limit=clip_limit)
+    if clip_limit > 0:
+        processed = exposure.equalize_adapthist(processed, clip_limit=clip_limit)
     processed = do_gauss(processed, sigma_b)
     if blend < 1:
         processed = np.ubyte(blend * processed * 255 + (1 - blend) * original * 255)
