@@ -31,7 +31,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
 import transformers
-from PIL import Image
+from PIL import Image, ImageOps
 from einops import rearrange
 from psutil import virtual_memory
 from pynvml import *
@@ -243,7 +243,7 @@ else:
 vae = get_vae().to(device)
 tokenizer = get_tokenizer()
 
-realesrgan = get_realesrgan('x4', device='cuda')
+realesrgan = get_realesrgan('x4', device='cuda', fp16=True)
 
 file_to_train = INPUT_IMAGE
 epoch_amt = EPOCH_AMOUNT
@@ -325,16 +325,17 @@ desc_dict = {'file': ['desc']}
 
 if multiple_image_tuning:
     data_folder = f'content/{INPUT_FOLDER}'
-    data_file_path = pathlib.Path(os.path.join(data_folder, INDIVIDUAL_DESCRIPTION_FILE))
-    if pathlib.Path.exists(data_file_path):
-        with open(data_file_path, mode='r') as infile:
-            reader = csv.reader(infile)
-            for row in reader:
-                val = translate(row[1])
-                if row[0] in desc_dict.keys():
-                    desc_dict[row[0]].append(val)
-                else:
-                    desc_dict[row[0]] = [val]
+    if cfg['data_desc'] is not None:
+        data_file_path = pathlib.Path(os.path.join(data_folder, INDIVIDUAL_DESCRIPTION_FILE))
+        if pathlib.Path.exists(data_file_path):
+            with open(data_file_path, mode='r') as infile:
+                reader = csv.reader(infile)
+                for row in reader:
+                    val = translate(row[1])
+                    if row[0] in desc_dict.keys():
+                        desc_dict[row[0]].append(val)
+                    else:
+                        desc_dict[row[0]] = [val]
     desc_dict.pop('file')
     with open('data_desc.csv', 'w', newline='', encoding='utf-8') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter=',')
@@ -410,6 +411,10 @@ class RuDalleDataset(Dataset):
         file_path, img_name, t_text = self.samples[item]
         try:
             image = load_image(file_path, img_name)
+            if cfg['flip_chance'] > 0:
+                roll = random.random()
+                if roll <= cfg['flip_chance']:
+                    image = ImageOps.flip(image)
             image = self.image_transform(image).to(device)
         except Exception as err:  # noqa
             print(err)
@@ -473,11 +478,12 @@ def make_preview_image(milestone_type: str, milestone: int):
         text=input_text, tokenizer=tokenizer, dalle=model,
         vae=vae, images_num=1, top_k=2048, top_p=0.999)
     if cfg['preview_super_res']:
-        preview_images = super_resolution(preview_images, realesrgan)
+        preview_images = super_resolution(preview_images, realesrgan, 1)
     preview_index = 0
     prefix = CAPTION if CAPTION is not None else MODEL_NAME
     preview_name = f'{prefix}_{milestone_type}{milestone + 1}_{preview_index:03d}'
     out_folder = f'content/output/{OUTPUT_FOLDER}'
+    pathlib.Path(out_folder).mkdir(parents=True, exist_ok=True)
     preview_save_path = pathlib.Path(os.path.join(out_folder, preview_name + '.png'))
 
     for p in range(len(preview_images)):
