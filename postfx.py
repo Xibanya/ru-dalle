@@ -50,11 +50,12 @@ def load_and_apply(path: str, noise=NOISE, noise_strength=NOISE_STRENGTH,
                    suffix='fx'):
     original = io.imread(str(path)) / 255.0
     processed = do_gauss(original, sigma_a)
-    with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
-    if noise_strength < 1:
-        processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
-    else:
-        processed = with_noise
+    if noise is not None and noise_strength > 0:
+        with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
+        if noise_strength < 1:
+            processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
+        else:
+            processed = with_noise
     if clip_limit > 0:
         processed = exposure.equalize_adapthist(processed, clip_limit=clip_limit)
     processed = do_gauss(processed, sigma_b)
@@ -69,11 +70,12 @@ def apply_to_pil(pil_image: Image, output_path, save_name: str,
                  blend=BLEND, sigma_a: float = SIGMA_A, sigma_b: float = SIGMA_B):
     original = pil_to_ndarray(pil_image) / 255.0
     processed = do_gauss(original, sigma_a)
-    with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
-    if noise_strength < 1:
-        processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
-    else:
-        processed = with_noise
+    if noise is not None and noise_strength > 0:
+        with_noise = skimage.util.random_noise(processed, mode=noise, clip=True)
+        if noise_strength < 1:
+            processed = np.ubyte(noise_strength * with_noise * 255 + (1 - noise_strength) * processed * 255)
+        else:
+            processed = with_noise
     if clip_limit > 0:
         processed = exposure.equalize_adapthist(processed, clip_limit=clip_limit)
     processed = do_gauss(processed, sigma_b)
