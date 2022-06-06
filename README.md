@@ -1,6 +1,24 @@
 # Local ruDalle
 The purpose of this repository is to offer an easy way to use ruDalle directly from an IDE such as pyCharm, cuz constantly running a process with a buncha arguments in the command line sux.
 
+# Installation
+first, you go to wherever you want all this stuff, then in the command line put
+```shell
+git clone https://github.com/Xibanya/ru-dalle.git
+```
+then enter the directory that gets made for the rest of the setup.
+
+You have to have pytorch installed in your env. if you already have it but you didn't install it with CUDA, you have to uninstall it and reinstall it again like this:
+```sh
+pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+```
+Check the official site for the install instruction for your specific OS and environment: https://pytorch.org/get-started/locally/
+
+you can also install the other stuff you probably need with
+```sh
+pip install -r requirements.txt
+```
+
 # Model Training
 ## How To Train A Model
 1. Download the repository (if you haven't already!)
