@@ -60,11 +60,11 @@ for extra fine control over training, you can put a data_desc.csv file in the da
 ## Post Effects! Wow!!
 When generating images you can opt to apply a little bit of post processing to them automatically. (The purpose being to make your anime cities, which you are of course generating, look more like old screenshots.)  This next image is unaltered output from the model.
 
-<img src="pics/original.png" width="512" height="512">
+<img src="pics/original.png" width="256" height="256">
 
 Same image with `noise=speckle`, `noise_strength=0.5`, `clip_limit=0.005`, `sigma_a=1`, `sigma_b=1`
 
-<img src="pics/all.png" width="512" height="512">
+<img src="pics/all.png" width="256" height="256">
 
 ### PostFX Config
 | Parameter | How to use |
