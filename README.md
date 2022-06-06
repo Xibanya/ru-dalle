@@ -1,9 +1,8 @@
 # Local ruDalle
 The purpose of this repository is to offer an easy way to use ruDalle directly from an IDE such as pyCharm, cuz constantly running a process with a buncha arguments in the command line sux.
 
-## HOW TO USE
-
-### How To Train A Model
+# Model Training
+## How To Train A Model
 1. Download the repository (if you haven't already!)
 2. Put a checkpoint you want to continue from in the checkpoints folder (optional)
 3. Put images in content/Data/name-of-your-model
@@ -11,6 +10,25 @@ The purpose of this repository is to offer an easy way to use ruDalle directly f
 5. run main.py
 
 for extra fine control over training, you can put a data_desc.csv file in the data folders to overwrite or append captions to individual images.
+
+### Training Config
+| Parameter | How to use |
+| ----------|------------|
+| `train_model` | name of model in checkpoints folder (omit the .pt) |
+| `train_prompt` | prompt for image generation. leave blank to use the default prompt from the original ruDalle colab notebook. Once you start training a model with a particular prompt, probably don't start using a different one unless you know what you're doing. |
+| `translate` | auto-translate prompt from English to Russian (if this is enabled, it won't try to translate the default prompt so don't worry about that.) |
+| `resume` | If `True`, resumes training from an existing checkpoint. If `False`, creates a new checkpoint or, if one with the provided `train_model` name exists, overwrites it. Be real careful about not leaving this `True` after the initial training session! |
+| `universe` | holdover from the looking glass colab notebook, if you don't know what learning rate you want, select how similar you want the images generated to be to the prompt images. Options are `Low`, `Medium`, `High`, and `Custom` |
+| `custom_lr` | Custom learning rate, used only if `universe = Custom`. For models with a large dataset, I like to set this to 1.0e-6 or 1.0e-7. |
+| `epochs` | How many times to loop over all the data. When training a model with a huge dataset and a very low learning rate, a little bit goes a long way here. On the other hand if you're training with just one or two images, probably 50-100 would do it. |
+| `warmup_steps` | when starting a new model, there's a risk of the model latching onto the first few samples it trains on and focusing on them too much from then on. Warmup steps are training steps with a really low learning rate to prevent this sort of thing from happening. You probably just need like 50? |
+| `log_epoch` | write to console what epoch it is at the start of a new epoch. Set 0 to not use. |
+| `save_epoch` | save a checkpoint with number of steps so far in training in the filename every `save_epoch` steps. Set 0 to not use. |
+| `preview_epoch` | generate an image with the prompt every `preview_epoch` epochs. Set 0 to not use. |
+| `preview_steps` | generate an image with the prompt every `preview_steps` steps. Set 0 to not use. Handy if you have so many samples in your dataset even a single epoch takes forever to get through. |
+| `preview_super_res` | upscale preview images if `True`; runs the risk of causing an out of memory error. |
+| `data_desc` | Optional training data for advanced nerds only. If there are captions specified for a specific image in a data_desc.csv file in content/Data/your-model-name, what to do about the additional caption(s). Options are `add`, `append`, `override`, or leave blank to disregard. `add` adds a single sample per caption associated with an image. `append` appends all the captions to a single dataloader entry. `override` will cause the image in question to not use the `train_prompt` at all (in favor of the one provided in the file.) |
+| `flip_chance` | value between 0 and 1, probability of images from dataset being flipped horizontally when loaded into the train dataloader. (Doesn't affect the image files on disk.) Maybe can help the model generalize better? |
 
 # Image Generation
 ## How To generate images
@@ -23,7 +41,7 @@ for extra fine control over training, you can put a data_desc.csv file in the da
 | Parameter | How to use |
 | ----------|------------|
 | `gen_model` | name of model in checkpoints folder (omit the .pt) |
-| `gen_prompt` | prompt for image generation (leave blank to use the default prompt from the original ruDalle colab notebook. Prompts are automatically translated to Russian so don't worry about that. |
+| `gen_prompt` | prompt for image generation. leave blank to use the default prompt from the original ruDalle colab notebook. Prompts are automatically translated to Russian so don't worry about that. |
 | `output_dir` | if left blank, output will be saved to content/output/your-models-name, use this to specify a subfolder of that directory to save stuff to |
 | `file_name` | If blank, the filenames of the generated images will be prefixed with the prompt. Otherwise they will be prefixed with this. |
 | `use_image_prompts` | if `True`, you must have images in content/Data/your-models-name/Prompt. These images will be used as prompts for image generation. If shuffle options below are enabled, image prompts will be randomized. |
