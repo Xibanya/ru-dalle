@@ -12,6 +12,7 @@ The purpose of this repository is to offer an easy way to use ruDalle directly f
 for extra fine control over training, you can put a data_desc.csv file in the data folders to overwrite or append captions to individual images.
 
 ### Training Config
+Edit these values in config.yaml
 | Parameter | How to use |
 | ----------|------------|
 | `train_model` | name of model in checkpoints folder (omit the .pt) |
@@ -26,9 +27,9 @@ for extra fine control over training, you can put a data_desc.csv file in the da
 | `save_epoch` | save a checkpoint with number of steps so far in training in the filename every `save_epoch` steps. Set 0 to not use. |
 | `preview_epoch` | generate an image with the prompt every `preview_epoch` epochs. Set 0 to not use. |
 | `preview_steps` | generate an image with the prompt every `preview_steps` steps. Set 0 to not use. Handy if you have so many samples in your dataset even a single epoch takes forever to get through. |
-| `preview_super_res` | upscale preview images if `True`; runs the risk of causing an out of memory error. |
-| `data_desc` | Optional training data for advanced nerds only. If there are captions specified for a specific image in a data_desc.csv file in content/Data/your-model-name, what to do about the additional caption(s). Options are `add`, `append`, `override`, or leave blank to disregard. `add` adds a single sample per caption associated with an image. `append` appends all the captions to a single dataloader entry. `override` will cause the image in question to not use the `train_prompt` at all (in favor of the one provided in the file.) |
+| `preview_super_res` | upscale preview images if `True`; might cause an out of memory error. But it might not. |
 | `flip_chance` | value between 0 and 1, probability of images from dataset being flipped horizontally when loaded into the train dataloader. (Doesn't affect the image files on disk.) Maybe can help the model generalize better? |
+| `data_desc` | Optional training data for advanced nerds only. If there are captions specified for a specific image in a data_desc.csv file in content/Data/your-model-name, what to do about the additional caption(s). Options are `add`, `append`, `override`, or leave blank to disregard. `add` adds a single sample per caption associated with an image. `append` appends all the captions to a single dataloader entry. `override` will cause the image in question to not use the `train_prompt` at all (in favor of the one provided in the file.) |
 
 # Image Generation
 ## How To generate images
@@ -38,6 +39,7 @@ for extra fine control over training, you can put a data_desc.csv file in the da
 4. run generate.py
 
 ### Generation Config
+Edit these values in config.yaml
 | Parameter | How to use |
 | ----------|------------|
 | `gen_model` | name of model in checkpoints folder (omit the .pt) |
@@ -67,6 +69,7 @@ Same image with `noise=speckle`, `noise_strength=0.5`, `clip_limit=0.005`, `sigm
 <img src="pics/all.png" width="256" height="256">
 
 ### PostFX Config
+Edit these values in config.yaml
 | Parameter | How to use |
 | ----------|------------|
 | `post_fx`  | `True` to enable processing. If `False`, none of the other params matter. |
