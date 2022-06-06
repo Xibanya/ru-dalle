@@ -6,20 +6,22 @@ import glob
 import pathlib
 import warnings
 from pathlib import Path
+from random import shuffle, random
+
 import torch
 import torch.nn.functional as F
-from PIL import Image
+import yaml
+from PIL import Image, ImageOps
 from pynvml import *
-from random import shuffle
 from tqdm import tqdm
+
+from colors import print_cyan, print_blue, print_green
+from postfx import apply_to_pil
+from prompt_translate import translate
 from rudalle import get_rudalle_model, get_tokenizer, get_vae, get_realesrgan
 from rudalle.image_prompts import ImagePrompts
-from rudalle.utils import seed_everything
 from rudalle.pipelines import generate_images, super_resolution
-from prompt_translate import translate
-from postfx import apply_to_pil
-from colors import print_cyan, print_blue, print_green
-import yaml
+from rudalle.utils import seed_everything
 
 with open(f'config.yaml', 'r') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -111,6 +113,8 @@ for i in tqdm(range(IMAGE_COUNT), colour='green'):
             if cfg['shuffle_loop'] and len(prompt_imgs) > 1:
                 shuffle(prompt_imgs)
         prompt_img = prompt_imgs[prompt_index]
+        if cfg['prompt_flip'] > 0.0 and random() <= cfg['prompt_flip']:
+            prompt_img = ImageOps.flip(prompt_img)
         prompt_index = prompt_index + 1
         image_prompt = ImagePrompts(prompt_img, borders, vae, 'cuda', crop_first=True)
         pil_images, score = generate_images(image_prompts=image_prompt, text=input_text, tokenizer=tokenizer,
